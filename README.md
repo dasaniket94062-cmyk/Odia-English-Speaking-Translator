@@ -1,80 +1,103 @@
-# Odia → English Spoken Translator
+# Odia → English Spoken Translator (free-services edition)
 
-A full-stack cascade speech pipeline:
+A full-stack cascade speech pipeline, built entirely on free services:
 
 ```
 your voice (Odia)
-   │  MediaRecorder captures audio in the browser
+   │  Browser's built-in Speech Recognition (or-IN)
    ▼
-Google Cloud Speech-to-Text (or-IN)  →  Odia text
+Odia text
+   │  POST /api/translate  ->  MyMemory free translation API (or -> en)
    ▼
-Google Cloud Translation (or → en)   →  English text
+English text
+   │  Browser's built-in Speech Synthesis
    ▼
-Google Cloud Text-to-Speech (en-IN)  →  spoken English
+spoken English
 ```
 
-Each stage is a plain REST endpoint, so you can review or fix the text between
-stages, or swap any one provider out without touching the others.
+Speech recognition and speech synthesis run entirely client-side (free, no
+API key, no server round trip). The backend's only job is the translation
+step — a small Express server that calls MyMemory, a free public
+translation API.
 
-## 1. Google Cloud setup
+## Why it's split this way
 
-1. Create a Google Cloud project (or use an existing one).
-2. Enable three APIs in that project: **Cloud Speech-to-Text**, **Cloud Translation**, **Cloud Text-to-Speech**.
-3. Create a **service account** with a role that can call these APIs (e.g. "Cloud Speech Client", "Cloud Translation API User", "Cloud Text-to-Speech User" — or the broader "Editor" role for a quick start).
-4. Create a JSON key for that service account and download it.
-5. Put that file at `server/google-service-account.json` (or anywhere you like — just point `GOOGLE_APPLICATION_CREDENTIALS` at it).
+There's no free, no-billing-account API for Odia speech-to-text or
+text-to-speech from the major cloud providers — Google/Azure/AWS all
+require a linked billing account even within a free quota. The browser's
+built-in Speech Recognition and Speech Synthesis APIs are genuinely free
+and need no setup, so ASR and TTS run there. Translation is different:
+MyMemory offers a real free public API with no account needed, so that
+stage runs on the backend, which also means you can swap the translation
+engine later without touching the frontend.
 
-Billing must be enabled on the project — these APIs aren't free past a small monthly quota, but that quota is generous for testing.
-
-## 2. Configure the server
+## 1. Run it
 
 ```bash
 cd server
 cp .env.example .env
-# edit .env: set GOOGLE_APPLICATION_CREDENTIALS to the path of your key file
 npm install
-```
-
-## 3. Run it
-
-```bash
 npm start
 ```
 
-Open `http://localhost:8080`. The frontend is served by the same Express
-server, so there's nothing separate to deploy.
+Open `http://localhost:8080` in **Chrome** (best support for Odia speech
+recognition; other browsers may not support the `or-IN` locale at all —
+type into the Odia box as a fallback).
 
-**Note on microphone access:** browsers only allow `getUserMedia` (microphone
-recording) on `localhost` or over HTTPS. That's fine for local development;
-once you deploy this publicly, put it behind HTTPS (most hosts — Render,
-Railway, Fly.io, a reverse proxy with Let's Encrypt — do this for you).
+## 2. Try it
+
+Click **Speak Odia**, allow microphone access, say a sentence, then click
+again to stop. With "Auto-run the pipeline" checked, it transcribes,
+translates, and speaks automatically — or you can review and edit the text
+at each stage first.
+
+## Known limitations of the free stack
+
+- **ASR quality varies by browser/OS.** Odia isn't as well supported as
+  major world languages in browser speech recognition. The Odia transcript
+  box is always editable so you can fix mistakes before translating.
+- **MyMemory is rate-limited** (roughly 5,000 words/day for anonymous
+  requests) and, since Odia↔English is a low-resource language pair,
+  translation quality can be inconsistent on longer or idiomatic sentences.
+- **Browser TTS voices** for English are functional but not especially
+  natural-sounding — quality depends on what voices your OS ships with.
+
+## Upgrading a stage later (still free, more setup)
+
+Each stage is isolated, so any one can be swapped without touching the
+others:
+
+- **ASR** — AI4Bharat's open-source `indicwav2vec-odia` or
+  `indic-conformer-600m-multilingual` models are trained specifically on
+  Odia and free to self-host, but need you to run a Python model server
+  with real compute (GPU recommended).
+- **MT** — AI4Bharat's `IndicTrans2` is tuned specifically for Indic
+  languages and outperforms general-purpose engines on Odia; also free to
+  self-host, same compute caveat.
+- **TTS** — AI4Bharat's `IndicF5` supports natural Odia and other Indic
+  voices if you later want the pipeline to speak Odia rather than just
+  transcribe it; for English output, browser TTS is usually sufficient.
+
+If you want a paid, zero-setup option instead, Google Cloud's
+Speech-to-Text / Translation / Text-to-Speech APIs (covered in the
+previous version of this project) are simpler to wire up and don't need
+a Python model server — just a billing account.
 
 ## Project layout
 
 ```
 server/
-  server.js                 Express app, mounts the three API routes
-  src/routes/transcribe.js  POST /api/transcribe  — audio  -> Odia text
-  src/routes/translate.js   POST /api/translate   — Odia text -> English text
-  src/routes/synthesize.js  POST /api/synthesize  — English text -> MP3 audio
-  src/services/googleClients.js   shared Google Cloud client setup
+  server.js                 Express app, serves the frontend + /api/translate
+  src/routes/translate.js   POST /api/translate — Odia text -> English text (MyMemory)
 public/
-  index.html, style.css, app.js   the frontend UI
+  index.html, style.css, app.js   the frontend UI (ASR + TTS run here)
 ```
-
-## Swapping providers
-
-Each route file only talks to Google Cloud through the small client in
-`googleClients.js`. To use Azure Speech, AWS, or an open model like
-AI4Bharat's IndicTrans2 instead, you only need to change the body of the
-relevant route — the frontend and the other two stages don't need to know.
 
 ## Things to harden before real production use
 
-- **Rate limiting / auth** on the API routes — right now anyone who can reach
-  the server can rack up your Google Cloud bill.
-- **File size / duration limits** on uploaded audio (a basic limit is already
-  set in `transcribe.js`, tune it for your use case).
-- **Logging & monitoring** for failed requests, so you notice API quota or
-  billing issues quickly.
-- **A CDN or build step** for the frontend if it grows past a single page.
+- **Rate limiting** on `/api/translate` — MyMemory's free tier is shared,
+  so a busy app could hit the daily limit quickly.
+- **A fallback translation provider** for when MyMemory is unavailable or
+  rate-limited.
+- **HTTPS in production** — browsers only allow microphone access
+  (`getUserMedia`/speech recognition) on `localhost` or over HTTPS.

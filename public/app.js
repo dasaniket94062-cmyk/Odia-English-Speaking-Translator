@@ -6,7 +6,6 @@ const translateBtn = document.getElementById('translateBtn');
 const speakBtn = document.getElementById('speakBtn');
 const autoFlow = document.getElementById('autoFlow');
 const statusLine = document.getElementById('statusLine');
-const player = document.getElementById('player');
 const stageAsr = document.getElementById('stageAsr');
 const stageMt = document.getElementById('stageMt');
 const stageTts = document.getElementById('stageTts');
@@ -28,73 +27,69 @@ async function readError(res){
   catch{ return res.statusText; }
 }
 
-// ---------- Recording (mic -> WebM/Opus blob) ----------
-let mediaRecorder = null;
-let chunks = [];
-let recording = false;
+// ---------- ASR (free, runs in the browser) ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let listening = false;
 
-async function startRecording(){
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
-  chunks = [];
+if(SR){
+  recognition = new SR();
+  recognition.lang = 'or-IN';
+  recognition.interimResults = true;
+  recognition.continuous = false;
 
-  mediaRecorder.ondataavailable = (e) => { if(e.data.size > 0) chunks.push(e.data); };
-  mediaRecorder.onstop = async () => {
-    stream.getTracks().forEach(t => t.stop());
-    const blob = new Blob(chunks, { type: 'audio/webm' });
-    await transcribe(blob);
+  recognition.onstart = () => {
+    listening = true;
+    micBtn.classList.add('listening');
+    micLabel.textContent = 'Listening…';
+    setStage(stageAsr, 'active');
+    setStatus('Listening for Odia speech…');
   };
 
-  mediaRecorder.start();
-  recording = true;
-  micBtn.classList.add('listening');
-  micLabel.textContent = 'Recording… tap to stop';
-  setStage(stageAsr, 'active');
-  setStatus('Recording — speak in Odia, then tap to stop.');
-}
+  recognition.onresult = (e) => {
+    let finalText = '';
+    let interim = '';
+    for(let i = 0; i < e.results.length; i++){
+      const t = e.results[i][0].transcript;
+      if(e.results[i].isFinal) finalText += t;
+      else interim += t;
+    }
+    odiaText.value = (finalText || interim).trim();
+  };
 
-function stopRecording(){
-  if(mediaRecorder && recording){
-    mediaRecorder.stop();
-    recording = false;
+  recognition.onerror = (e) => {
+    setStatus('Speech recognition error: ' + e.error + '. You can type Odia text instead.', true);
+  };
+
+  recognition.onend = () => {
+    listening = false;
     micBtn.classList.remove('listening');
-    micLabel.textContent = 'Record Odia';
-  }
+    micLabel.textContent = 'Speak Odia';
+    setStage(stageAsr, 'done');
+    if(odiaText.value.trim()){
+      setStatus('Transcribed. Review the Odia text, then translate.');
+      if(autoFlow.checked) translate();
+    } else {
+      setStatus('No speech captured — try again or type the Odia text.');
+    }
+  };
+} else {
+  micBtn.disabled = true;
+  micLabel.textContent = 'Mic not supported here';
+  setStatus('Your browser doesn\'t support speech recognition — type Odia text below instead.', true);
 }
 
-micBtn.addEventListener('click', async () => {
-  if(recording){ stopRecording(); return; }
+micBtn.addEventListener('click', () => {
+  if(!recognition) return;
+  if(listening){ recognition.stop(); return; }
   odiaText.value = '';
   englishText.value = '';
   resetStages();
-  try{
-    await startRecording();
-  }catch(err){
-    setStatus('Could not access the microphone: ' + err.message, true);
-  }
+  try{ recognition.start(); }
+  catch(err){ setStatus('Could not start microphone: ' + err.message, true); }
 });
 
-// ---------- ASR ----------
-async function transcribe(blob){
-  setStatus('Transcribing Odia speech…');
-  const form = new FormData();
-  form.append('audio', blob, 'speech.webm');
-
-  try{
-    const res = await fetch('/api/transcribe', { method: 'POST', body: form });
-    if(!res.ok) throw new Error(await readError(res));
-    const data = await res.json();
-    odiaText.value = data.text;
-    setStage(stageAsr, 'done');
-    setStatus('Transcribed. Review the Odia text, then translate.');
-    if(autoFlow.checked) translate();
-  }catch(err){
-    setStage(stageAsr, null);
-    setStatus('Transcription failed: ' + err.message, true);
-  }
-}
-
-// ---------- MT ----------
+// ---------- MT (backend call -> free MyMemory API) ----------
 async function translate(){
   const text = odiaText.value.trim();
   if(!text){ setStatus('Nothing to translate yet.', true); return; }
@@ -124,33 +119,28 @@ async function translate(){
 }
 translateBtn.addEventListener('click', translate);
 
-// ---------- TTS ----------
-async function speak(){
+// ---------- TTS (free, runs in the browser) ----------
+function speak(){
   const text = englishText.value.trim();
   if(!text){ setStatus('Nothing to speak yet.', true); return; }
-
-  speakBtn.disabled = true;
-  setStage(stageTts, 'active');
-  setStatus('Synthesizing speech…');
-
-  try{
-    const res = await fetch('/api/synthesize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-    if(!res.ok) throw new Error(await readError(res));
-    const blob = await res.blob();
-    player.src = URL.createObjectURL(blob);
-    await player.play();
-    setStage(stageTts, 'done');
-    setStatus('Speaking…');
-    player.onended = () => setStatus('Done.');
-  }catch(err){
-    setStage(stageTts, null);
-    setStatus('Speech synthesis failed: ' + err.message, true);
-  }finally{
-    speakBtn.disabled = false;
+  if(!('speechSynthesis' in window)){
+    setStatus('Speech synthesis isn\'t supported in this browser.', true);
+    return;
   }
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'en-IN';
+  const voices = window.speechSynthesis.getVoices();
+  const enVoice = voices.find(v => v.lang === 'en-IN') || voices.find(v => v.lang && v.lang.startsWith('en'));
+  if(enVoice) utter.voice = enVoice;
+
+  utter.onstart = () => { setStage(stageTts, 'active'); setStatus('Speaking…'); };
+  utter.onend = () => { setStage(stageTts, 'done'); setStatus('Done.'); };
+  utter.onerror = () => { setStatus('Could not play speech audio.', true); };
+
+  window.speechSynthesis.speak(utter);
 }
 speakBtn.addEventListener('click', speak);
+if('speechSynthesis' in window){
+  window.speechSynthesis.onvoiceschanged = () => {};
+}

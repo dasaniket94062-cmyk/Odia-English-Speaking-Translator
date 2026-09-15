@@ -1,7 +1,7 @@
 {
   "name": "odia-english-translator-server",
-  "version": "1.0.0",
-  "description": "Backend for a cascade speech pipeline: Odia speech -> Odia text -> English text -> English speech.",
+  "version": "2.0.0",
+  "description": "Backend for a cascade speech pipeline using only free services: browser ASR, free MyMemory translation, browser TTS.",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -9,13 +9,9 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
-    "@google-cloud/speech": "^6.7.0",
-    "@google-cloud/text-to-speech": "^5.3.0",
-    "@google-cloud/translate": "^8.5.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.19.2",
-    "multer": "^1.4.5-lts.1"
+    "express": "^4.19.2"
   },
   "engines": {
     "node": ">=18"

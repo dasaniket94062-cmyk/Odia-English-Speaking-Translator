@@ -13,7 +13,7 @@
   <header>
     <p class="kicker">ଓଡ଼ିଆ ରୁ ଇଂରାଜୀ</p>
     <h1>Speak Odia. Hear English.</h1>
-    <p>A cascade speech pipeline: your spoken Odia is transcribed to text, translated to English, then read aloud — powered by Google Cloud Speech-to-Text, Translation, and Text-to-Speech.</p>
+    <p>A cascade speech pipeline built entirely on free services: your browser transcribes and speaks, a free translation API handles the Odia-to-English step in between.</p>
   </header>
 
   <div class="pipeline">
@@ -51,7 +51,7 @@
   </div>
 
   <div class="controls">
-    <button id="micBtn"><span class="ring"></span><span id="micLabel">Record Odia</span></button>
+    <button id="micBtn"><span class="ring"></span><span id="micLabel">Speak Odia</span></button>
     <button id="translateBtn">Translate →</button>
     <button id="speakBtn">🔊 Speak English</button>
     <label class="auto-toggle">
@@ -61,15 +61,13 @@
   </div>
   <div class="status-line" id="statusLine">Ready.</div>
 
-  <audio id="player" hidden></audio>
-
   <details>
     <summary>What's running behind this page</summary>
     <div class="arch-body">
       <ul>
-        <li><strong>ASR</strong> — your recording is sent to <code>/api/transcribe</code>, which calls Google Cloud Speech-to-Text with the <code>or-IN</code> locale.</li>
-        <li><strong>MT</strong> — the Odia text is sent to <code>/api/translate</code>, which calls Google Cloud Translation (<code>or</code> → <code>en</code>).</li>
-        <li><strong>TTS</strong> — the English text is sent to <code>/api/synthesize</code>, which calls Google Cloud Text-to-Speech and streams back an MP3.</li>
+        <li><strong>ASR</strong> — runs in your browser's built-in speech recognition, set to Odia (<code>or-IN</code>). Free, no server call. Quality depends on your browser/OS — a text box is always there to fix or type the transcript.</li>
+        <li><strong>MT</strong> — the Odia text is sent to <code>/api/translate</code> on the backend, which calls MyMemory, a free public translation API (no key required, rate-limited).</li>
+        <li><strong>TTS</strong> — runs in your browser's built-in speech synthesis, reading the English text aloud. Free, no server call.</li>
       </ul>
       <p>Every stage is editable before it moves to the next — correct the Odia transcript, or rewrite the English translation, before it's spoken.</p>
     </div>
