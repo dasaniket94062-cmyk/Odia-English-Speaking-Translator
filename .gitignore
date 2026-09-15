@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit these
+.env
+server/.env
+*.json
+!server/package.json
+!server/package-lock.json
+
+# OS/editor cruft
+.DS_Store
+.vscode/

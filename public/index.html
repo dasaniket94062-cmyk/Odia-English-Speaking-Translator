@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ଓଡ଼ିଆ → English — Spoken Translator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Oriya:wght@400;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+Oriya:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="kicker">ଓଡ଼ିଆ ରୁ ଇଂରାଜୀ</p>
+    <h1>Speak Odia. Hear English.</h1>
+    <p>A cascade speech pipeline: your spoken Odia is transcribed to text, translated to English, then read aloud — powered by Google Cloud Speech-to-Text, Translation, and Text-to-Speech.</p>
+  </header>
+
+  <div class="pipeline">
+    <div class="stage" id="stageAsr">
+      <span class="dot"></span>
+      <span class="label">Speech → Odia text</span>
+    </div>
+    <div class="stage" id="stageMt">
+      <span class="dot"></span>
+      <span class="label">Odia → English text</span>
+    </div>
+    <div class="stage" id="stageTts">
+      <span class="dot"></span>
+      <span class="label">English text → Speech</span>
+    </div>
+  </div>
+
+  <div class="leaf">
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">ଓଡ଼ିଆ</span>
+          <span class="panel-sub">editable transcript</span>
+        </div>
+        <textarea id="odiaText" placeholder="ମାଇକ୍ ଟିପି କୁହନ୍ତୁ, କିମ୍ବା ଏଠାରେ ଲେଖନ୍ତୁ…"></textarea>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">English</span>
+          <span class="panel-sub">translation</span>
+        </div>
+        <textarea id="englishText" placeholder="Translation will appear here…"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="micBtn"><span class="ring"></span><span id="micLabel">Record Odia</span></button>
+    <button id="translateBtn">Translate →</button>
+    <button id="speakBtn">🔊 Speak English</button>
+    <label class="auto-toggle">
+      <input type="checkbox" id="autoFlow" checked>
+      Auto-run the pipeline
+    </label>
+  </div>
+  <div class="status-line" id="statusLine">Ready.</div>
+
+  <audio id="player" hidden></audio>
+
+  <details>
+    <summary>What's running behind this page</summary>
+    <div class="arch-body">
+      <ul>
+        <li><strong>ASR</strong> — your recording is sent to <code>/api/transcribe</code>, which calls Google Cloud Speech-to-Text with the <code>or-IN</code> locale.</li>
+        <li><strong>MT</strong> — the Odia text is sent to <code>/api/translate</code>, which calls Google Cloud Translation (<code>or</code> → <code>en</code>).</li>
+        <li><strong>TTS</strong> — the English text is sent to <code>/api/synthesize</code>, which calls Google Cloud Text-to-Speech and streams back an MP3.</li>
+      </ul>
+      <p>Every stage is editable before it moves to the next — correct the Odia transcript, or rewrite the English translation, before it's spoken.</p>
+    </div>
+  </details>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
